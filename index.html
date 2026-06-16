@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urinal Etiquette Game</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .card { background: #fff; border-radius: 16px; box-shadow: 0 2px 16px rgba(0,0,0,0.09); padding: 2rem 1.5rem; max-width: 520px; width: 100%; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 0.25rem; }
+  .tagline { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .score-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .score-label { font-size: 13px; color: #888; }
+  .score-val { font-size: 18px; font-weight: 600; }
+  .streak { font-size: 12px; color: #d97706; font-weight: 600; }
+  .progress-bar { height: 4px; background: #e5e5e5; border-radius: 2px; margin-bottom: 1.25rem; }
+  .progress-fill { height: 100%; background: #1D9E75; border-radius: 2px; transition: width 0.3s; }
+  .scenario-title { font-size: 15px; font-weight: 600; margin-bottom: 0.2rem; display: flex; align-items: center; gap: 8px; }
+  .scenario-sub { font-size: 13px; color: #666; margin-bottom: 1.25rem; }
+  .diff-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .diff-easy { background: #dcfce7; color: #166534; }
+  .diff-medium { background: #fef3c7; color: #92400e; }
+  .diff-hard { background: #fee2e2; color: #991b1b; }
+  .legend { display: flex; gap: 14px; margin-bottom: 1rem; }
+  .legend-item { font-size: 11px; color: #999; }
+  .urinal-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .urinal-btn { position: relative; width: 68px; height: 86px; border-radius: 8px 8px 14px 14px; border: 1.5px solid #ddd; background: #f9f9f7; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 7px; transition: transform 0.1s, background 0.15s, border-color 0.15s; }
+  .urinal-btn:hover:not(:disabled) { background: #f0f0ee; border-color: #bbb; transform: scale(1.05); }
+  .urinal-btn:disabled { cursor: default; }
+  .urinal-inner { width: 44px; height: 54px; background: #fff; border-radius: 6px 6px 10px 10px; border: 1px solid #e0e0e0; position: absolute; top: 9px; }
+  .urinal-num { font-size: 11px; color: #aaa; position: absolute; bottom: 4px; }
+  .person { font-size: 24px; position: absolute; top: -28px; }
+  .urinal-btn.correct { background: #dcfce7; border-color: #22c55e; }
+  .urinal-btn.wrong { background: #fee2e2; border-color: #ef4444; }
+  .urinal-btn.optimal { outline: 2.5px solid #22c55e; outline-offset: 2px; }
+  .feedback { text-align: center; font-size: 14px; font-weight: 500; margin-bottom: 1rem; min-height: 1.4rem; line-height: 1.4; }
+  .feedback.good { color: #166534; }
+  .feedback.bad { color: #991b1b; }
+  .next-btn { display: block; margin: 0 auto; padding: 9px 28px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1.5px solid #ddd; background: #f5f5f3; color: #1a1a18; cursor: pointer; transition: background 0.15s; }
+  .next-btn:hover { background: #eaeae8; }
+  .end-screen { text-align: center; padding: 1.5rem 0; }
+  .end-score { font-size: 52px; font-weight: 700; margin: 0.5rem 0; }
+  .end-label { color: #888; font-size: 14px; }
+  .end-msg { font-size: 14px; color: #333; margin: 0.75rem 0 1.5rem; }
+  .restart-btn { padding: 10px 32px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1.5px solid #ddd; background: #f5f5f3; cursor: pointer; }
+  .restart-btn:hover { background: #eaeae8; }
+  @media (max-width: 400px) { .urinal-btn { width: 52px; height: 70px; } .urinal-inner { width: 34px; height: 44px; } }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🚻 Urinal Etiquette</h1>
+  <p class="tagline">Pick the most socially acceptable urinal. The unwritten rules await.</p>
+
+  <div class="score-bar">
+    <div><span class="score-label">Score </span><span class="score-val" id="score">0</span></div>
+    <div id="streak-el" class="streak"></div>
+    <div><span class="score-label">Round </span><span class="score-val" id="round-el">1/10</span></div>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+  <div id="game-area"></div>
+</div>
+
+<script>
+const SCENARIOS = [
+  { count:3, occupied:[], correct:[0,2], label:"3 empty urinals", sub:"No one around. Pick a spot.", diff:"easy", hint:"Always take an end — never the middle of an empty row." },
+  { count:5, occupied:[], correct:[0,4], label:"5 empty urinals", sub:"Empty row. Choose wisely.", diff:"easy", hint:"Ends only when the row is empty." },
+  { count:5, occupied:[2], correct:[0,4], label:"5 urinals, one guy in the middle", sub:"Someone is at #3. Where do you go?", diff:"easy", hint:"Take the far ends — maximum distance from the occupant." },
+  { count:5, occupied:[0,4], correct:[2], label:"Both ends taken", sub:"Ends are gone. Now what?", diff:"medium", hint:"When ends are taken, go to the exact middle — best buffer from both." },
+  { count:6, occupied:[0,5], correct:[2,3], label:"6 urinals, both ends taken", sub:"Ends are occupied. Find the sweet spot.", diff:"medium", hint:"Middle pair gives equal distance from both ends." },
+  { count:5, occupied:[1,3], correct:[0,4], label:"Alternating occupants", sub:"Guys at #2 and #4. What's left?", diff:"medium", hint:"Only the ends give you any buffer at all." },
+  { count:7, occupied:[0,3,6], correct:[5], label:"7 urinals, every-other taken", sub:"Guys at #1, #4, and #7.", diff:"hard", hint:"#6 puts you next to just one guy. #5 puts you between two. Never go between two." },
+  { count:4, occupied:[0], correct:[3], label:"4 urinals, leftmost taken", sub:"Someone is at #1. Options?", diff:"easy", hint:"Go to the opposite end — maximum distance." },
+  { count:5, occupied:[0,1,3,4], correct:[2], label:"4 out of 5 taken", sub:"Nearly full. Only one real choice.", diff:"medium", hint:"Only #3 is open. Sometimes you have no choice — eyes forward." },
+  { count:6, occupied:[1,4], correct:[0,5], label:"Symmetric block", sub:"Guys at #2 and #5.", diff:"medium", hint:"Far ends give you the most breathing room." },
+];
+
+let currentRound=0, score=0, streak=0, answered=false;
+const scenarios=[...SCENARIOS].sort(()=>Math.random()-0.5).slice(0,10);
+
+function render(){
+  const el=document.getElementById('game-area');
+  if(currentRound>=scenarios.length){showEnd(el);return;}
+  const s=scenarios[currentRound];
+  document.getElementById('round-el').textContent=(currentRound+1)+'/'+scenarios.length;
+  document.getElementById('progress').style.width=(currentRound/scenarios.length*100)+'%';
+  answered=false;
+  const dc=s.diff==='easy'?'diff-easy':s.diff==='medium'?'diff-medium':'diff-hard';
+  let html=`<div class="scenario-title">${s.label}<span class="diff-badge ${dc}">${s.diff}</span></div>
+  <div class="scenario-sub">${s.sub}</div>
+  <div class="legend"><div class="legend-item">🚹 = occupied</div><div class="legend-item">Tap to choose</div></div>
+  <div class="urinal-row" id="urinals">`;
+  for(let i=0;i<s.count;i++){
+    const occ=s.occupied.includes(i);
+    html+=`<button class="urinal-btn${occ?' occupied':''}" id="u${i}" onclick="pick(${i})" ${occ?'disabled':''} aria-label="Urinal ${i+1}${occ?' occupied':''}">
+      ${occ?'<div class="person">🚹</div>':''}
+      <div class="urinal-inner"></div>
+      <span class="urinal-num">${i+1}</span>
+    </button>`;
+  }
+  html+=`</div><div class="feedback" id="feedback"></div>
+  <button class="next-btn" id="next-btn" onclick="nextRound()" style="display:none">${currentRound<scenarios.length-1?'Next →':'See results →'}</button>`;
+  el.innerHTML=html;
+}
+
+function pick(i){
+  if(answered)return;
+  answered=true;
+  const s=scenarios[currentRound];
+  const ok=s.correct.includes(i);
+  const fb=document.getElementById('feedback');
+  document.querySelectorAll('.urinal-btn').forEach(b=>b.disabled=true);
+  if(ok){
+    document.getElementById('u'+i).classList.add('correct');
+    score++;streak++;
+    document.getElementById('score').textContent=score;
+    fb.className='feedback good';
+    const msgs=['✓ Solid etiquette!','✓ Textbook move.','✓ Maximum buffer achieved.','✓ The code is strong with you.','✓ A true gentleman.'];
+    fb.textContent=msgs[Math.floor(Math.random()*msgs.length)];
+  } else {
+    document.getElementById('u'+i).classList.add('wrong');
+    streak=0;
+    s.correct.forEach(c=>document.getElementById('u'+c).classList.add('optimal'));
+    fb.className='feedback bad';
+    fb.textContent='✗ '+s.hint;
+  }
+  document.getElementById('streak-el').textContent=streak>=3?`🔥 ${streak} streak`:'';
+  document.getElementById('next-btn').style.display='block';
+}
+
+function nextRound(){currentRound++;render();}
+
+function showEnd(el){
+  document.getElementById('progress').style.width='100%';
+  const pct=Math.round(score/scenarios.length*100);
+  const msg=pct===100?'Perfect score. A true gentleman of the lavatory.':
+    pct>=80?'Strong etiquette instincts.':
+    pct>=60?'Passable. Study the code.':
+    pct>=40?'You have caused several men discomfort.':
+    'You have violated the unwritten law. Repeatedly.';
+  el.innerHTML=`<div class="end-screen">
+    <div class="end-label">Final score</div>
+    <div class="end-score">${score}/${scenarios.length}</div>
+    <div style="font-size:13px;color:#999;margin-bottom:0.5rem;">${pct}% correct</div>
+    <div class="end-msg">${msg}</div>
+    <button class="restart-btn" onclick="restart()">Play again</button>
+  </div>`;
+}
+
+function restart(){
+  currentRound=0;score=0;streak=0;
+  scenarios.sort(()=>Math.random()-0.5);
+  document.getElementById('score').textContent='0';
+  document.getElementById('streak-el').textContent='';
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
